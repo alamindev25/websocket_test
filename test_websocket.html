@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Message Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .messages {
+            border: 1px solid #ddd;
+            height: 400px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-left: 3px solid #007bff;
+            background-color: white;
+        }
+
+        .message .user {
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .message .time {
+            font-size: 0.8em;
+            color: #666;
+            float: right;
+        }
+
+        .message .content {
+            margin-top: 5px;
+        }
+
+        .send-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .send-form input,
+        .send-form button {
+            padding: 10px;
+        }
+
+        .send-form input[type="text"] {
+            flex: 1;
+        }
+
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .status.connected {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔴 Live Message Test</h1>
+
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+
+        <div id="messages" class="messages">
+            <div class="message">
+                <div class="user">System</div>
+                <div class="time">Now</div>
+                <div class="content">Connecting to WebSocket...</div>
+            </div>
+        </div>
+
+        <div class="send-form">
+            <input type="text" id="username" placeholder="Your Name" value="TestUser">
+            <input type="text" id="messageInput" placeholder="Type your message here...">
+            <button onclick="sendMessage()">Send Message</button>
+        </div>
+
+        <div class="send-form">
+            <input type="text" id="valueInput" placeholder="Chart value (optional)" type="number">
+            <button onclick="sendChartData()">Send Chart Data</button>
+        </div>
+
+        <button onclick="loadHistory()">Load Message History</button>
+    </div>
+
+    <script>
+        let socket = null;
+        const messagesDiv = document.getElementById('messages');
+        const statusDiv = document.getElementById('status');
+        const messageInput = document.getElementById('messageInput');
+        const usernameInput = document.getElementById('username');
+        const valueInput = document.getElementById('valueInput');
+
+        // Connect to WebSocket
+        function connectWebSocket() {
+            try {
+                socket = new WebSocket('ws://localhost:8000/ws/live-chart/');
+
+                socket.onopen = function (event) {
+                    updateStatus('Connected', true);
+                    addMessage('System', 'Connected to WebSocket!', new Date());
+                };
+
+                socket.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+                    console.log('Received:', data);
+
+                    if (data.user && (data.message || data.value)) {
+                        const content = data.message ?
+                            `💬 ${data.message}` :
+                            `📊 Chart value: ${data.value}`;
+                        addMessage(data.user, content, new Date(data.time));
+                    }
+                };
+
+                socket.onclose = function (event) {
+                    updateStatus('Disconnected', false);
+                    addMessage('System', 'WebSocket connection closed', new Date());
+                };
+
+                socket.onerror = function (error) {
+                    updateStatus('Error', false);
+                    addMessage('System', 'WebSocket error: ' + error, new Date());
+                };
+            } catch (error) {
+                updateStatus('Error', false);
+                addMessage('System', 'Failed to connect: ' + error, new Date());
+            }
+        }
+
+        // Send message via API
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            const username = usernameInput.value.trim() || 'Anonymous';
+
+            if (!message) return;
+
+            try {
+                const response = await fetch('/api/messages/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        username: username
+                    })
+                });
+
+                if (response.ok) {
+                    messageInput.value = '';
+                    addMessage('You', `💬 ${message}`, new Date());
+                } else {
+                    throw new Error('Failed to send message');
+                }
+            } catch (error) {
+                addMessage('System', 'Failed to send message: ' + error, new Date());
+            }
+        }
+
+        // Send chart data via API
+        async function sendChartData() {
+            const value = parseFloat(valueInput.value);
+            const username = usernameInput.value.trim() || 'Anonymous';
+
+            if (isNaN(value)) {
+                alert('Please enter a valid number');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/chart-data/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        value: value,
+                        username: username
+                    })
+                });
+
+                if (response.ok) {
+                    valueInput.value = '';
+                    addMessage('You', `📊 Chart value: ${value}`, new Date());
+                } else {
+                    throw new Error('Failed to send chart data');
+                }
+            } catch (error) {
+                addMessage('System', 'Failed to send chart data: ' + error, new Date());
+            }
+        }
+
+        // Load message history
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/chart-data/');
+                const data = await response.json();
+
+                messagesDiv.innerHTML = '';
+
+                data.reverse().forEach(item => {
+                    const content = item.message ?
+                        `💬 ${item.message}` :
+                        `📊 Chart value: ${item.value}`;
+                    addMessage(item.user_display || 'Anonymous', content, new Date(item.created_at));
+                });
+            } catch (error) {
+                addMessage('System', 'Failed to load history: ' + error, new Date());
+            }
+        }
+
+        // Add message to display
+        function addMessage(user, content, time) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <div class="user">${user}</div>
+                <div class="time">${time.toLocaleTimeString()}</div>
+                <div class="content">${content}</div>
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Update connection status
+        function updateStatus(status, connected) {
+            statusDiv.textContent = `Status: ${status}`;
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+        }
+
+        // Handle Enter key in message input
+        messageInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Connect on page load
+        window.onload = function () {
+            connectWebSocket();
+            loadHistory();
+        };
+    </script>
+</body>
+
+</html>

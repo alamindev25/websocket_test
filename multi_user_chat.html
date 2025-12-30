@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-User Chat Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f2f5;
+        }
+
+        .chat-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        .user-panel {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-header {
+            text-align: center;
+            padding: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message.own {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.other {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .message .user {
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .message .time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+
+        .input-area button {
+            padding: 12px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .input-area button:hover {
+            background: #0056b3;
+        }
+
+        .status {
+            padding: 8px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .controls button {
+            margin: 5px;
+            padding: 10px 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .auto-reply {
+            margin-top: 10px;
+        }
+
+        .auto-reply label {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="controls">
+        <h1>🚀 Multi-User Live Chat Test</h1>
+        <button onclick="startAutoChat()">Start Auto Chat Test</button>
+        <button onclick="stopAutoChat()">Stop Auto Chat</button>
+        <button onclick="clearAllChats()">Clear All</button>
+        <button onclick="loadHistory()">Load History</button>
+    </div>
+
+    <div class="chat-container">
+        <!-- User 1 -->
+        <div class="user-panel">
+            <div class="user-header">
+                <h3>👤 আল-আমিন</h3>
+                <div id="status1" class="status disconnected">Disconnected</div>
+            </div>
+            <div id="messages1" class="messages"></div>
+            <div class="input-area">
+                <input type="text" id="input1" placeholder="Type message..." onkeypress="handleEnter(event, 1)">
+                <button onclick="sendMessage(1)">Send</button>
+            </div>
+            <div class="auto-reply">
+                <label><input type="checkbox" id="auto1"> Auto Reply</label>
+            </div>
+        </div>
+
+        <!-- User 2 -->
+        <div class="user-panel">
+            <div class="user-header">
+                <h3>👩 রিমা</h3>
+                <div id="status2" class="status disconnected">Disconnected</div>
+            </div>
+            <div id="messages2" class="messages"></div>
+            <div class="input-area">
+                <input type="text" id="input2" placeholder="Type message..." onkeypress="handleEnter(event, 2)">
+                <button onclick="sendMessage(2)">Send</button>
+            </div>
+            <div class="auto-reply">
+                <label><input type="checkbox" id="auto2"> Auto Reply</label>
+            </div>
+        </div>
+
+        <!-- User 3 -->
+        <div class="user-panel">
+            <div class="user-header">
+                <h3>👨 রহিম</h3>
+                <div id="status3" class="status disconnected">Disconnected</div>
+            </div>
+            <div id="messages3" class="messages"></div>
+            <div class="input-area">
+                <input type="text" id="input3" placeholder="Type message..." onkeypress="handleEnter(event, 3)">
+                <button onclick="sendMessage(3)">Send</button>
+            </div>
+            <div class="auto-reply">
+                <label><input type="checkbox" id="auto3"> Auto Reply</label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const users = [
+            { id: 1, name: 'আল-আমিন', socket: null },
+            { id: 2, name: 'রিমা', socket: null },
+            { id: 3, name: 'রহিম', socket: null }
+        ];
+
+        let autoChats = {
+            1: ['আসসালামু আলাইকুম!', 'কেমন আছেন সবাই?', 'আজকের আবহাওয়া চমৎকার', 'কাজ কেমন চলছে?'],
+            2: ['ওয়া আলাইকুমুস সালাম!', 'আলহামদুলিল্লাহ ভালো', 'হ্যাঁ, সত্যিই সুন্দর আবহাওয়া', 'অফিসের কাজ একটু বেশি'],
+            3: ['সবাইকে সালাম!', 'আমিও ভালো আছি', 'আজ বাইরে বেড়াতে যাওয়া যায়', 'আমারও একই অবস্থা']
+        };
+
+        let autoInterval = null;
+        let messageIndex = 0;
+
+        // Connect all users
+        function connectAllUsers() {
+            users.forEach(user => {
+                connectUser(user.id);
+            });
+        }
+
+        // Connect individual user
+        function connectUser(userId) {
+            try {
+                const socket = new WebSocket('ws://localhost:8000/ws/live-chart/');
+                users[userId - 1].socket = socket;
+
+                socket.onopen = function (event) {
+                    updateStatus(userId, 'Connected', true);
+                    addMessage(userId, 'System', 'Connected to chat!', new Date(), false);
+                };
+
+                socket.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+                    if (data.user && data.message) {
+                        // Add message to all user panels
+                        users.forEach(user => {
+                            const isOwn = data.user === user.name;
+                            addMessage(user.id, data.user, data.message, new Date(data.time), isOwn);
+                        });
+
+                        // Auto reply if enabled
+                        if (document.getElementById(`auto${userId}`).checked && data.user !== users[userId - 1].name) {
+                            setTimeout(() => {
+                                autoReply(userId);
+                            }, 1000 + Math.random() * 2000); // Random delay 1-3 seconds
+                        }
+                    }
+                };
+
+                socket.onclose = function (event) {
+                    updateStatus(userId, 'Disconnected', false);
+                    addMessage(userId, 'System', 'Disconnected from chat', new Date(), false);
+                };
+
+                socket.onerror = function (error) {
+                    updateStatus(userId, 'Error', false);
+                    addMessage(userId, 'System', 'Connection error', new Date(), false);
+                };
+            } catch (error) {
+                updateStatus(userId, 'Error', false);
+                addMessage(userId, 'System', 'Failed to connect: ' + error, new Date(), false);
+            }
+        }
+
+        // Send message
+        async function sendMessage(userId) {
+            const input = document.getElementById(`input${userId}`);
+            const message = input.value.trim();
+            if (!message) return;
+
+            const username = users[userId - 1].name;
+
+            try {
+                const response = await fetch('/api/messages/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        username: username
+                    })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                } else {
+                    throw new Error('Failed to send message');
+                }
+            } catch (error) {
+                addMessage(userId, 'System', 'Failed to send: ' + error, new Date(), false);
+            }
+        }
+
+        // Auto reply
+        function autoReply(userId) {
+            const replies = [
+                'হ্যাঁ, ঠিক বলেছেন!',
+                'একদম সত্যি কথা',
+                'আমিও একই মত',
+                'চমৎকার বলেছেন!',
+                'হাহাহা, মজার কথা!',
+                'সুন্দর!',
+                'ভালো লাগলো শুনতে',
+                'একেবারে ঠিক!'
+            ];
+
+            const randomReply = replies[Math.floor(Math.random() * replies.length)];
+            document.getElementById(`input${userId}`).value = randomReply;
+            sendMessage(userId);
+        }
+
+        // Start auto chat test
+        function startAutoChat() {
+            messageIndex = 0;
+            autoInterval = setInterval(() => {
+                const userId = (messageIndex % 3) + 1;
+                const userMessages = autoChats[userId];
+                const messageText = userMessages[Math.floor(messageIndex / 3) % userMessages.length];
+
+                document.getElementById(`input${userId}`).value = messageText;
+                sendMessage(userId);
+
+                messageIndex++;
+
+                if (messageIndex > 20) { // Stop after 20 messages
+                    stopAutoChat();
+                }
+            }, 3000); // Send message every 3 seconds
+        }
+
+        // Stop auto chat
+        function stopAutoChat() {
+            if (autoInterval) {
+                clearInterval(autoInterval);
+                autoInterval = null;
+            }
+        }
+
+        // Add message to chat
+        function addMessage(userId, user, content, time, isOwn) {
+            const messagesDiv = document.getElementById(`messages${userId}`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
+
+            messageDiv.innerHTML = `
+                <div class="user">${user}</div>
+                <div>${content}</div>
+                <div class="time">${time.toLocaleTimeString()}</div>
+            `;
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Update status
+        function updateStatus(userId, status, connected) {
+            const statusDiv = document.getElementById(`status${userId}`);
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+        }
+
+        // Handle enter key
+        function handleEnter(event, userId) {
+            if (event.key === 'Enter') {
+                sendMessage(userId);
+            }
+        }
+
+        // Clear all chats
+        function clearAllChats() {
+            users.forEach(user => {
+                document.getElementById(`messages${user.id}`).innerHTML = '';
+            });
+        }
+
+        // Load history
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/chart-data/');
+                const data = await response.json();
+
+                clearAllChats();
+
+                data.reverse().forEach(item => {
+                    if (item.message) {
+                        users.forEach(user => {
+                            const isOwn = item.user_display === user.name;
+                            addMessage(user.id, item.user_display || 'Anonymous', item.message, new Date(item.created_at), isOwn);
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load history:', error);
+            }
+        }
+
+        // Initialize on page load
+        window.onload = function () {
+            connectAllUsers();
+            loadHistory();
+        };
+    </script>
+</body>
+
+</html>
